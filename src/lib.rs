@@ -751,6 +751,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             y.exp_round(Round::Down);
             y.set_prec(prec);
             return y;
+        }
         if type == 3 {
             return mpc_pos(y, prec, rnd);
         }
