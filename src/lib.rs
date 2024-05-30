@@ -688,7 +688,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
     }
     
     if need_reflection {
-        if type == 0 or type == 2 {
+        if type == 0 || type == 2 {
             let mut A = mpc_sin_pi(zorig, wp) * zorig;
             let mut B = Complex::with_val(wp, (-pi(wp), Float::with_val(wp, 0.0)));
             if yfinal {
@@ -732,6 +732,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             }
             s1.set_prec(prec);
             return mpc_pos(s1, prec);
+        }
     } else {
         if type == 0 {
             if r != 0 {
