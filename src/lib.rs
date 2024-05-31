@@ -919,14 +919,14 @@ fn siegeltheta(t: Complex, derivative: i32) -> Complex {
     }
     if d == 0 {
         if !t.imag().is_zero() {
-            let a = mpc_log_gamma(Complex::with_val(prec, (0.25, 0.5)) * t));
-            let b = mpc_log_gamma(Complex::with_val(prec, (0.25, -0.5)) * t));
+            let a = mpc_log_gamma(Complex::with_val(prec, (0.25, 0.5)) * t);
+            let b = mpc_log_gamma(Complex::with_val(prec, (0.25, -0.5)) * t);
             return -pi(prec).ln()/2 * t - Complex::with_val(prec, (0.0, 0.5)) * (a-b);
         } else {
             if t.real().is_infinite() {
                 return t;
             }
-            return mpc_log_gamma(Complex::with_val(prec, (0.25, 0.5)) * t)).imag() - pi(prec).ln()/2.0 * t;
+            return mpc_log_gamma(Complex::with_val(prec, (0.25, 0.5)) * t).imag() - pi(prec).ln()/2.0 * t;
         }
     } else if d > 0 {
         let a = mpc_pow_int(Complex::with_val(prec, (0.0, -0.5)), Integer::from(d-1)) * mpc_polygamma(d-1 as i64, Complex::with_val(prec, (0.25, -0.5)) * t, prec);
@@ -1118,7 +1118,7 @@ fn mpc_zeta(s: Complex, prec: u32) -> Complex {
     let re = s.real();
     let im = s.imag();
     if im.is_zero() {
-        return Complex::with_val(re.zeta(), 0.0));
+        return Complex::with_val(prec, (re.zeta(), 0.0));
     }
     
     let sabs = s.abs();
@@ -1732,7 +1732,7 @@ struct MDNewton {
     converged: bool, 
     f: fn(Complex) -> Complex,
     x0: Complex,
-    J: fn(
+    J: fn(Matrix) -> Complex,
     tol: f64,
     verbose: bool,
     method: FindRootMethod,
@@ -2559,6 +2559,7 @@ fn mod_pi2(man: Integer, exp: Integer, mag: i32, mut wp: u32) -> (Float, Integer
                 break;
             }
             i += 1;
+        }
     } else {
         wp += -mag;
         offset = exp + wp;
