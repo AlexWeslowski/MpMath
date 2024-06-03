@@ -523,7 +523,7 @@ fn mpc_gamma(z: Complex, utype: u32, prec: u32) -> Complex {
     if mag < -8 {
         if mag < -wp {
             z.set_prec(wp);
-            let v = z + z * z * mpf_euler(wp);
+            let v = z + z * z * euler_fixed(wp);
             if utype == 0 {
                 v = 1 / v;
             } else if utype == 1 {
@@ -591,7 +591,7 @@ fn mpc_gamma(z: Complex, utype: u32, prec: u32) -> Complex {
                 let x = zsub1 * pi(wp);
                 x = x * x;
                 x = x / 12;
-                let y = zsub1 * -mpf_euler(wp);
+                let y = zsub1 * -euler_fixed(wp);
                 yfinal = x + y;
                 if !need_reflection {
                     return mpc_pos(yfinal, prec, rnd);
@@ -611,7 +611,7 @@ fn mpc_gamma(z: Complex, utype: u32, prec: u32) -> Complex {
                 zsub2.set_prec(wp);
                 x = zsub2 * zsub2 * t;
                 x = x / 12;
-                y = zsub2 * (Float::with_val(wp, 1.0) - mpf_euler(wp));
+                y = zsub2 * (Float::with_val(wp, 1.0) - euler_fixed(wp));
                 yfinal = x + y;
                 if !need_reflection {
                     yfinal.set_prec(prec);
@@ -1143,9 +1143,8 @@ fn mpc_zeta(s: Complex, prec: u32) -> Complex {
     let mut y;
     if pole_dist > wp {
         if alt != 0 {
-            q = wp.ln2();
-            q.set_prec(wp);
-            y = q * mpf_euler(wp);
+            q = Complex::with_val(wp, (wp as f32, 0.0)).ln2();
+            y = q * euler_fixed(wp);
             let mut g = (q * q) >> -1;
             g = y - g;
             let mut z = r * -g
@@ -1153,9 +1152,10 @@ fn mpc_zeta(s: Complex, prec: u32) -> Complex {
             z.set_prec(prec);
             return z;
         } else {
-            q = mpc_neg(mpc_div(mpc_one, r, wp))
-            q = mpc_add_mpf(q, mpf_euler(wp), wp)
-            return mpc_pos(q, prec, rnd)
+            r.set_prec(wp);
+            q = Complex::with_val(wp, (-1.0, 0.0)) / r + euler_fixed(wp);
+            q.set_prec(prec);
+            return q;
         }
     } else {
         wp += max(0, pole_dist);
@@ -2161,16 +2161,18 @@ fn exponential_series(mut x: Float, utype: u32, prec: u32) -> (Float, Float) {
         c = sum(sums) + one;
     }
     /*
-    if utype == 0:
-        s = isqrt_fast(c*c - (one<<wp))
-        if sign:
-            v = c - s
-        else:
-            v = c + s
-        for i in range(r):
-            v = (v*v) >> wp
-        return v >> extra
-    else:
+    if utype == 0 {
+        s = isqrt_fast(c * c - (Float::with_val(wp, 1.0) << wp));
+        if sign != 0 {
+            v = c - s;
+        } else {
+            v = c + s;
+        }
+        for i in 0..r {
+            v = (v * v) >> wp;
+        }
+        return v >> extra;
+    }
     */
     if utype == 1 || utype == 2 {
         let pshift = wp - 1;
@@ -3008,7 +3010,7 @@ fn aux_J_needed(xA: f64, xeps4: f64, a: f64, xB1: f64, xM: f64) -> i64 {
 }
 
 // 
-// https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/libintmath.py
+// https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/libintmath.py#L444
 // 
 fn eulernum(m: i64) -> Float {
     if m & 1 {
@@ -3033,14 +3035,42 @@ fn eulernum(m: i64) -> Float {
     return Pow::pow(-1, n/2) * suma / Pow::pow(2, n);
 }
 
+
 // 
-// https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/libmpc.py
+// https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/gammazeta.py#L253
 // 
-fn mpc_expjpi(z: Complex, prec: u32) {
+fn euler_fixed(mut prec: u32) -> Float {
+    prec += 30;
+    let p = ((prec as f32)/4.0) * (2 as f32).ln()).ln2() as i32 + 1;
+    let n = Integer::from(2).pow(p);
+    let npow2 = n.pow(2);
+    let A = Float::with_val(prec, -p as f32 * (prec as f32).ln2());
+    let U = A.clone();
+    let B = Float::with_val(prec, 1.0) << prec;
+    let V = B.clone();
+    let k = Integer::from(1);
+    loop {
+        B = (B * npow2 / k.pow(2)).floor();
+        A = ((A * npow2  / k + B) / k).floor();
+        U += A;
+        V += B;
+        if A.abs() < 100 && B.abs() < 100 {
+            break;
+        }
+        k += 1;
+    }
+    return (U << (prec - 30)) / V;
+}
+
+
+// 
+// https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/libmpc.py#L825
+// 
+fn mpc_expjpi(z: Complex, prec: u32) -> Complex {
     let mut re = z.real();
     let mut im = z.imag();
     if im.is_zero() {
-        return mpf_cos_sin_pi(re, prec);
+        return Complex::with_val(prec, mpf_cos_sin_pi(re, prec));
     }
     sign = im.signum();
     man = im.get_significand().unwrap();
@@ -3054,16 +3084,15 @@ fn mpc_expjpi(z: Complex, prec: u32) {
     im.set_prec(wp);
     if re.is_zero() {
         im.set_prec(prec);
-        return (im.exp(), 0.0);
+        return Complex::with_val(prec, (im.exp(), 0.0));
     }
     im.set_prec(prec + 10);
     let ey = im.exp();
-    let (c, s) = mpf_cos_sin_pi(re, prec + 10);
-    re = ey * c;
-    re.set_prec(prec);
-    im = ey * s;
-    im.set_prec(prec);
-    return (re, im);
+    let z = Complex::with_val(prec + 10, mpf_cos_sin_pi(re, prec + 10));
+    *z.mut_real() = ey * z.real();
+    *z.mut_imag() = ey * z.imag();
+    z.set_prec(prec);
+    return z;
 }
 
 fn _coef(J: i32, eps: i32) -> RsCache {
@@ -3090,7 +3119,7 @@ fn _coef(J: i32, eps: i32) -> RsCache {
     for n in 0..(2*newJ+1) {
         let mut wa = Float::with_val(prec, 1.0) / Float::factorial(n);
         wa = wa / Pow::pow(2, n);
-        w.insert(n, wa * pipower[n]);
+        w.insert(n, wa * pipower[&n]);
     }
     prec = 15
     let wpp1a = 9 - mag(Float:with_val(53, neweps6));
@@ -3636,7 +3665,7 @@ fn Rzeta_simul(s, der=0) {
             //prec = ywptcoef[&k];
             for ell in 0..(3*k/2+1) {
                 ytcoef[(chi, k, ell)] = 0;
-                for mu in range(0, chi+1) {
+                for mu in 0..(chi + 1) {
                     tcoefter = mpf_binomial(Float::with_val(ywptcoef[&k], chi), Float::with_val(ywptcoef[&k], mu)) * Pow::pow(la, mu) * yfortcoef[(chi-mu, k, ell)];
                     ytcoef[(chi, k, ell)] += tcoefter;
                 }
