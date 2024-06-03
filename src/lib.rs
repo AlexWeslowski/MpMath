@@ -79,10 +79,10 @@ fn bernfrac(n: i64, prec: u32) -> Rational {
     
 fn mpf_bernoulli_huge(n: i64, prec: u32) -> Float {
     let wp = prec + 10;
-    let fn = Float::with_val(wp, n);
-    let piprec = wp + (fn.log2() as u32);
+    let fltn = Float::with_val(wp, n);
+    let piprec = wp + (fltn.log2() as u32);
     let mut v = Float::with_val(wp, Float::factorial(n + 1.0));
-    v = v * fn.zeta();
+    v = v * fltn.zeta();
     v = v * Pow::pow(pi(piprec), -fn);
     v = v >> (1 - n);
     if !(n & 3) {
@@ -193,7 +193,7 @@ const EXP_COSH_CUTOFF: u32 = 600;
 // 
 // https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/libelefun.py#L1107
 // 
-fn exp_expneg_basecase(x, prec: u32) -> (Float, Float) {
+fn exp_expneg_basecase(x: Float, prec: u32) -> (Float, Float) {
     if prec > EXP_COSH_CUTOFF {
         let (cosh, sinh) = exponential_series(x, 1, prec);
         return (cosh + sinh, cosh - sinh);
@@ -387,7 +387,7 @@ fn mpc_digamma(mut z: Complex, prec: u32) -> Complex {
     let mut t = Complex::with_val(wp, (1.0, 0.0));
     let mut prev = Float::with_val(wp, 0.0);
     let mut szprev = 0.0;
-    k = 1
+    k = 1;
     eps = Float::with_val(wp, 1.0) << (-(wp as i32) + 2);
     loop {
         t = t * z2;
@@ -410,7 +410,8 @@ fn mpc_polygamma(mut m: i64, mut z: Complex, prec: u32) -> Complex {
     if m == 0 {
         return mpc_digamma(z, prec);
     }
-    let (re, im) = z.real(), z.imag();
+    let re = z.real();
+    let im = z.imag();
     let wp = prec + 20;
     z.set_prec(wp);
     let sign = re.signum();
@@ -483,7 +484,7 @@ fn mpc_polygamma(mut m: i64, mut z: Complex, prec: u32) -> Complex {
 //
 // https://github.com/mpmath/mpmath/blob/master/mpmath/libmp/gammazeta.py#L1887 
 // 
-fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
+fn mpc_gamma(z: Complex, utype: u32, prec: u32) -> Complex {
     let mut a = z.real();
     let mut b = z.imag();
     let mut asign = a.signum();
@@ -497,13 +498,13 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
     
     if b.is_zero() {
         // todo: check if is_sign_positive() is correct
-        if type == 3 && a.is_sign_positive() {
+        if utype == 3 && a.is_sign_positive() {
             a.ln_gamma_round(Round::Down);
             let n = (-aman) >> (-aexp)
             let im = pi(prec + 10) * n;
             return Complex::with_val(prec, (a, im));
         }
-        return Complex::with_val(prec, (mpf_gamma(a, type, prec), 0.0));
+        return Complex::with_val(prec, (mpf_gamma(a, utype, prec), 0.0));
     }
     
     if (aman.is_zero() && !aexp.is_zero()) || (bman.is_zero() && !bexp.is_zero()) {
@@ -523,28 +524,28 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
         if mag < -wp {
             z.set_prec(wp);
             let v = z + z * z * mpf_euler(wp);
-            if type == 0 {
+            if utype == 0 {
                 v = 1 / v;
-            } else if type == 1 {
+            } else if utype == 1 {
                 v = z / v;
-            } else if type == 2 {
+            } else if utype == 2 {
                 // v = mpc_pos(v);
-            } else if type == 3 {
+            } else if utype == 3 {
                 v = 1 / v;
                 v.ln_round(Round::Down);
             }
             v.set_prec(prec);
             return v;
-        } else if type != 1 {
+        } else if utype != 1 {
             wp += (-mag)
         }
     }
     
-    if type == 3 && mag > wp && (!a.is_sign_positive() || bmag >= amag) {
+    if utype == 3 && mag > wp && (!a.is_sign_positive() || bmag >= amag) {
         return mpc_sub(mpc_mul(z, mpc_log(z, wp), wp), z, prec, rnd)
     }
     
-    if type == 1 {
+    if utype == 1 {
         return mpc_gamma(Complex::with_val(prec, (a + Float::with_val(prec, 1.0), b)), 0, prec);
     }
     
@@ -552,7 +553,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
     let bn = b.to_integer().abs();
     let absn = max(an, bn);
     let gamma_size = absn * mag;
-    if type == 3 {
+    if utype == 3 {
         pass;
     } else {
         wp += gamma_size.bit_length();
@@ -577,7 +578,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
     let mut yfinal = 0;
     let balance_prec = 0;
     if bmag < -10 {
-        if type == 3 {
+        if utype == 3 {
             let zsub1 = z - Float::with_val(wp, 1.0);
             let cancel1;
             if zsub1.real().is_zero() {
@@ -625,8 +626,8 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             let mut aabs = a.abs();
             aabs.set_prec(pp);
             let eps = Float::with_val(amag, 1.0) >> (amag-wp);
-            let x1 = mpf_gamma(aabs, pp, type=type);
-            let x2 = mpf_gamma(aabs + eps, pp, type=type);
+            let x1 = mpf_gamma(aabs, pp, utype);
+            let x2 = mpf_gamma(aabs + eps, pp, utype);
             let xprime = mpf_div(mpf_sub(x2, x1, pp), eps, pp);
             let y = b * xprime;
             yfinal = (x1, y);
@@ -669,7 +670,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
         yim = ((lre*bfix + lim*afix)>>wp) - (lim>>1) + yim;
         y = from_man_exp(yre, -wp), from_man_exp(yim, -wp);
         
-        if r != 0 && type == 3 {
+        if r != 0 && utype == 3 {
             y = y - r.ln();
             let zfa = zprered.real().to_f64();
             let zfb = zprered.imag().to_f64();
@@ -688,11 +689,11 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
     }
     
     if need_reflection {
-        if type == 0 || type == 2 {
+        if utype == 0 || utype == 2 {
             let mut A = mpc_sin_pi(zorig, wp) * zorig;
             let mut B = Complex::with_val(wp, (-pi(wp), Float::with_val(wp, 0.0)));
             if yfinal {
-                if type == 2 {
+                if utype == 2 {
                     A = mpc_div(A, yfinal, wp)
                 } else {
                     A = mpc_mul(A, yfinal, wp)
@@ -703,14 +704,14 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             if r != 0 {
                 B = B * r;
             }
-            if type == 0 {
+            if utype == 0 {
                 return B / A;
             }
-            if type == 2 {
+            if utype == 2 {
                 return A / B;
             }
         }
-        if type == 3 {
+        if utype == 3 {
             if yfinal {
                 s1 = mpc_neg(yfinal);
             } else {
@@ -734,7 +735,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             return mpc_pos(s1, prec);
         }
     } else {
-        if type == 0 {
+        if utype == 0 {
             if r != 0 {
                 r = y.exp() / r;
                 r.set_prec(prec);
@@ -742,7 +743,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             }
             return mpc_exp(y, prec, rnd)
         }
-        if type == 2 {
+        if utype == 2 {
             if r != 0 {
                 r = r / y.exp();
                 r.set_prec(prec);
@@ -753,7 +754,7 @@ fn mpc_gamma(z: Complex, type: u32, prec: u32) -> Complex {
             y.set_prec(prec);
             return y;
         }
-        if type == 3 {
+        if utype == 3 {
             return mpc_pos(y, prec, rnd);
         }
     }
@@ -797,8 +798,8 @@ fn mpc_pow(z: Complex, w: Complex, prec:u32) {
 
 fn mpc_pow_mpf(z: Complex, p: Float, prec: u32) -> Complex {
     psign = p.signum();
-    pman  p.get_significand().unwrap();
-    pexp  p.get_exp().unwrap();
+    pman = p.get_significand().unwrap();
+    pexp = p.get_exp().unwrap();
     pbc = pman.significant_bits();
     if pexp >= 0 {
         return mpc_pow_int(z, Pow::pow(-1, psign) * (pman << pexp), prec);
@@ -819,35 +820,36 @@ fn mpc_pow_int(z: Complex, n: Integer, prec: u32) -> Complex {
     a = z.real();
     b = z.imag();
     if !b.is_zero() {
-        return mpf_pow_int(a, n, prec, rnd), fzero
+        return Complex::with_val(prec, (a.pow(n), Float::with_val(prec, 0.0)));
     } 
     if a.is_zero() {
-        v = mpf_pow_int(b, n, prec, rnd)
-        n %= 4
+        v = b.pow(n);
+        n %= 4;
         if n == 0 {
-            return v, fzero
-        } elif n == 1 {
-            return fzero, v
-        } elif n == 2 {
-            return mpf_neg(v), fzero
+            return Complex::with_val(prec, (v, Float::with_val(prec, 0.0)));
+        } else if n == 1 {
+            return Complex::with_val(prec, (Float::with_val(prec, 0.0), v));
+        } else if n == 2 {
+            v.signum_mut() = -v.signum();
+            return Complex::with_val(prec, (v, Float::with_val(prec, 0.0)));
         } else {
-            return fzero, mpf_neg(v)
+            v.signum_mut() = -v.signum();
+            return Complex::with_val(prec, (Float::with_val(prec, 0.0), v));
         }
     }
     if n == 0 {
         Complex::with_val(prec, (1.0, 0.0));
-    }
-    if n == 1 {
+    } else if n == 1 {
         return z;
-    }
-    if n == 2 {
+    } else if n == 2 {
         return z * z;
-    }
-    if n == -1 {
+    } else if n == -1 {
         return 1 / z;
-    }
-    if n < 0 {
-        return 1 / mpc_pow_int(z, -n, prec + 4);
+    } else if n < 0 {
+        z.set_prec(prec + 4);
+        z = 1.0 / z.pow(-n);
+        z.set_prec(prec);
+        return z;
     }
     let asign = a.signum();
     let mut aman = a.get_significand().unwrap();
@@ -947,11 +949,11 @@ fn siegeltheta(t: Complex, derivative: i32) -> Complex {
     }
 }
 
-fn wpzeros(t) -> u32 {
+fn wpzeros(t: f64) -> u32 {
     let mut wp = 53;
     if t > 3 * Pow::pow(10, 8) {
         wp = 63;
-    }
+    } 
     if t > Pow::pow(10, 11) {
         wp = 70;
     }
@@ -1034,7 +1036,7 @@ fn lambertw_scalar(z: Complex, k: i64, tol: f64) -> Complex {
         let ew = w.exp();
         let wew = w * ew;
         let wewz = wew - z;
-        let wn = w - wewz / (wew + ew - (w + 2) * wewz / (2 * w + 2))
+        let wn = w - wewz / (wew + ew - (w + 2) * wewz / (2 * w + 2));
         if (wn - w).abs() < tol * wn.abs() {
             return wn;
         } else {
@@ -1127,14 +1129,14 @@ fn mpc_zeta(s: Complex, prec: u32) -> Complex {
         panic!("mpc_zeta() NotImplementedError");
     }
     
-    let wp = prec + 20
+    let wp = prec + 20;
     s.set_prec(wp);
     let r = Complex::with_val(wp, (1.0, 0.0)) - s;
     let mut rabs = r.abs();
     rabs.set_prec(10);
     let asign = rabs.signum();
-    let aman  rabs.get_significand().unwrap();
-    let aexp  rabs.get_eps().unwrap();
+    let aman = rabs.get_significand().unwrap();
+    let aexp = rabs.get_eps().unwrap();
     let abc = aman.significant_bits();
     let pole_dist = -2 * (aexp + abc);
     let mut q;
@@ -1247,7 +1249,7 @@ fn zeta(s: Complex, method: ZetaMethod) -> Complex {
     let a = 1;
     let derivative = 0;
     d = derivative;
-    if a == 1 && !(d != 0 || method != ZetaMethod:None) {
+    if a == 1 && !(d != 0 || method != ZetaMethod::None) {
         return mpc_zeta(s);
     }
     //s = ctx.convert(s)
@@ -1317,7 +1319,7 @@ fn siegelz(t: Complex, derivative: u32, prec: u32) -> Complex {
     let prec = t.prec() + 21;
     t.set_prec(prec);
     let e1 = mpc_expj(siegeltheta(t).into(), 0);
-    let z = zeta(Float::with_val(prec, 0.5) + Complex::with_val(prec, (0, 1)) * t, ZetaMethod:None);
+    let z = zeta(Float::with_val(prec, 0.5) + Complex::with_val(prec, (0, 1)) * t, ZetaMethod::None);
     if d == 0 {
         v = e1 * z;
         //self.prec = prec;
@@ -1493,7 +1495,7 @@ impl Illinois {
             method: method,
             getm: _getm(self.method),
             queue: VecDeque::with_capacity(30),
-        }    
+        };
         if self.verbose {
             println!("using {} method", self.method);
         }
@@ -1522,7 +1524,7 @@ impl Iterator for Illinois {
             self.fa = (self.f)(self.a);
             self.fb = (self.f)(self.b);
         }
-        for i in range 0..10 {
+        for i in 0..10 {
             let l = self.b - self.a;
             if l == 0.0 {
                 self.step += 1;
@@ -1568,236 +1570,6 @@ impl Iterator for Illinois {
 
 
 
-fn jacobian(f, x: Matrix) {
-    let h = eps.sqrt();
-    let fx = f(*x);
-    let m = fx.len();
-    let n = x.len();
-    let mut J = [[0; m]; n];
-    for j in 0..n {
-        let mut xj = x.clone();
-        xj[j] += h;
-        Jj = (f(*xj) - fx) / h;
-        for i in 0..m {
-            J[i][j] = Jj[i];
-        }
-    }
-    return J;
-}
-
-
-struct Matrix {
-    A: [[Float; 2]; 2],
-    rows: u32,
-    cols: u32,
-    _LU: ([[Float; 2]; 2], [Float; 2])
-}
-
-impl Matrix {
-    fn new(a: [[Float; 2]; 2]) -> Matrix {
-        Matrix {
-            A: a,
-            rows: 2,
-            cols: 2,
-            _LU: ([[Float::with_val(53, 0.0); 2]; 2], [Float::with_val(53, 0.0); 2])
-        }
-    }
-}
-
-
-
-
-fn LU_decomp(A: [[Float; 2]; 2]) -> ([[Float; 2]; 2], [Float; 2]) {
-    let overwrite = false;
-    let use_cache = true;
-    /*
-    if A.rows != A.cols {
-        panic!("need n*n matrix");
-    }
-    */
-    if use_cache && A._LU {
-        return A._LU;
-    }
-    let orig;
-    let Acopy;
-    if !overwrite {
-        orig = A;
-        Acopy = A.clone();
-    } else {
-        Acopy = A;
-    }
-    tol = (mnorm(Acopy, 1) * eps).abs();
-    let n = 2;
-    let mut p = [Special::Infinity; n - 1];
-    for j in 0..(n - 1) {
-        biggest = 0;
-        for k in j..n {
-            s = Float::with_val(prec, 0.0);
-            for l in j..n {
-                s += Acopy[k][l].abs();
-            }
-            if s.abs() <= tol {
-                panic!("ZeroDivisionErrormatrix is numerically singular.");
-            }
-            current = 1/s * Acopy[k][j].abs();
-            if current > biggest {
-                biggest = current;
-                p[j] = k;
-            }
-        }
-        if p[j].is_infinite() {
-            panic!("ZeroDivisionError, matrix is numerically singular.");
-        }
-        swap_row(Acopy, j, p[j]);
-        if Acopy[j][j].abs() <= tol {
-            panic!("ZeroDivisionError matrix is numerically singular");
-        }
-        for i in (j + 1)..n {
-            Acopy[i][j] /= Acopy[j][j];
-            for k in (j + 1)..n {
-                Acopy[i][k] -= Acopy[i][j] * Acopy[j][k];
-            }
-        }
-    }
-    /*
-    if p && Acopy[n - 1][n - 1].abs() <= tol {
-        panic!("ZeroDivisionError, matrix is numerically singular");
-    }
-    */
-    if !overwrite {
-        orig._LU = (Acopy, p);
-    }
-    return Acopy, p;
-}
-
-fn L_solve(L: [[Float; 2]; 2], b: [Float; 2], p=Special::Infinity) {
-    let n = 2;
-    b = b.clone();
-    if p {
-        for k in 0..p.len() {
-            swap_row(b, k, p[k]);
-        }
-    }
-    for i in 1..n {
-        for j in 0..i {
-            b[i] -= L[i][j] * b[j];
-        }
-    }
-    return b;
-}
-
-fn U_solve(U: [[Float; 2]; 2], y) {
-    let n = 2;
-    let mut x = y.clone();
-    for i in ((n - 1)..-1).step_by(-1) {
-        for j in (i + 1)..n {
-            x[i] -= U[i,j] * x[j];
-        }
-        x[i] /= U[i][i];
-    }
-    return x;
-}
-
-
-fn lu_solve(A: [[Float; 2]; 2], b: [Float; 2]) {
-    //prec = ctx.prec;
-    prec += 10;
-    let mut Acopy = A.clone();
-    let mut bcopy = b.clone();
-    if Acopy.rows < Acopy.cols {
-        panic!("cannot solve underdetermined system.");
-    }
-    let x;
-    /*
-    if Acopy.rows > Acopy.cols {
-        let AH = Acopy.H;
-        Acopy = AH * Acopy;
-        bcopy = AH * bcopy;
-        x = cholesky_solve(Acopy, bcopy);
-    } else {
-    */
-    let p;
-    (Acopy, p) = LU_decomp(Acopy);
-    bcopy = L_solve(Acopy, bcopy, p);
-    x = U_solve(Acopy, bcopy);
-    //}
-    x.set_prec(prec);
-    return x;
-}
-
-
-struct MDNewton {
-    step: i32,
-    maxsteps: i32,
-    converged: bool, 
-    f: fn(Complex) -> Complex,
-    x0: Complex,
-    J: fn(Matrix) -> Complex,
-    tol: f64,
-    verbose: bool,
-    method: FindRootMethod,
-    queue: VecDeque<(Matrix, Float)>,
-}
-
-impl MDNewton {
-    fn new(f: fn(Complex) -> [[Float; 2]; 2], x0: Complex, norm: Fn(Complex) -> Float) -> MDNewton {
-        MDNewton {
-            f: f,
-            x0: Matrix(x0),
-            J: move |x| { jacobian(f, x) },
-            norm: norm,
-            verbose: false,
-            converged: false,
-            step: 0,
-            maxsteps: 10,
-            method: FindRootMethod::Mdnewton,
-            queue: VecDeque::with_capacity(10),
-        }
-    }
-    
-    fn iter(&mut self) {
-        let f = self.f;
-        let mut x0 = self.x0;
-        let norm = self.norm;
-        let J = self.J;
-        let mut fx = f(*x0);
-        let mut fxnorm = norm(fx);
-        self.converged = false;
-        loop {
-            let fxn = -fx;
-            let Jx = J(*x0);
-            let s = lu_solve(Jx, fxn);
-            if self.verbose {
-                println!("Jx: {}", Jx);
-                println!("s: {}", s);
-            }
-            let mut l = one;
-            let mut x1 = x0 + s;
-            loop {
-                if x1 == x0 {
-                    if self.verbose {
-                        println!("Canceled, won 't get more exact.");
-                    }
-                    self.converged = true;
-                    break;
-                }
-                fx = f(*x1);
-                let newnorm = norm(fx);
-                if newnorm < fxnorm {
-                    fxnorm = newnorm;
-                    x0 = x1;
-                    break;
-                }
-                l /= 2;
-                x1 = x0 + l * s;
-            }
-            queue.push_back((x0, fxnorm));
-            if self.converged {
-                break;
-            }
-        }
-    }
-}
 
 
 /*
@@ -1847,7 +1619,7 @@ fn findroot(f: Fn(Complex) -> Complex, x0: (Complex, Complex), solver: FindRootM
     // multidimensional functions
     try:
         fx = f(*x0)
-        multidimensional = isinstance(fx, (list, tuple, matrix))
+        multidimensional = isinstance(fx, (Vec, tuple, Matrix))
     except TypeError:
         fx = f(x0[0])
         multidimensional = False
@@ -1893,7 +1665,7 @@ fn findroot(f: Fn(Complex) -> Complex, x0: (Complex, Complex), solver: FindRootM
             println!("error: {}", err);
         }
         i += 1;
-        if err < tol * max(1, norm(x)) or i >= maxsteps {
+        if err < tol * max(1, norm(x)) || i >= maxsteps {
             break;
         }
     }
@@ -1908,7 +1680,7 @@ fn findroot(f: Fn(Complex) -> Complex, x0: (Complex, Complex), solver: FindRootM
     }
     */
     xl = x;
-    if verify and Pow::pow(norm(f(*xl)), 2) > tol {
+    if verify && Pow::pow(norm(f(*xl)), 2) > tol {
         //panic!("Could not find root within given tolerance. ({} > {}) Try another starting point or tweak arguments.", Pow::pow(norm(f(*xl)), 2), tol));
     }
     x.set_prec(prec);
@@ -1916,7 +1688,7 @@ fn findroot(f: Fn(Complex) -> Complex, x0: (Complex, Complex), solver: FindRootM
 }
 
 
-fn separate_zeros_in_block(zero_number_block, mut T: Vec<Float>, mut V: Vec<Float>, limitloop, fp_tolerance=None) -> (Vec<Float>, Vec<Float>, bool) {
+fn separate_zeros_in_block(zero_number_block: usize, mut T: Vec<Float>, mut V: Vec<Float>, limitloop: u32, fp_tolerance: f64) -> (Vec<Float>, Vec<Float>, bool) {
     let mut loopnumber = 0;
     let mut variations = count_variations(V);
     let prec = max(T[0].prec(), V[0].prec());
@@ -2068,7 +1840,7 @@ fn search_supergood_block(&self, n: i64, fp_tolerance: f64) -> (i64, (i64, i64),
         V.insert(0, v);
         while b < 0 {
             m2 -= 1;
-            t,v,b = compute_triple_tvb(m2);
+            (t, v, b) = compute_triple_tvb(m2);
             T.insert(0, t);
             V.insert(0, v);
         }
@@ -2174,7 +1946,7 @@ fn find_rosser_block_zero(n: i64) -> (i64, (i64, i64), Vec<Float>, Vec<Float>) {
 // 
 // https://github.com/mpmath/mpmath/blob/master/mpmath/functions/zetazeros.py#L136
 // 
-def separate_my_zero(my_zero_number: i64, zero_number_block, T: Vec<Float>, V: Vec<Float>, prec: u32) -> Float {
+fn separate_my_zero(my_zero_number: i64, zero_number_block, T: Vec<Float>, V: Vec<Float>, prec: u32) -> Float {
     let variations = 0;
     let v0 = V[0];
     let k0;
@@ -2323,7 +2095,7 @@ fn isqrt_fast(x: i64) {
 
 const EXP_SERIES_U_CUTOFF: u32 = 1500;
 
-fn exponential_series(mut x: Float, type: u32, prec: u32) -> (Float, Float) {
+fn exponential_series(mut x: Float, utype: u32, prec: u32) -> (Float, Float) {
     let sign;
     if x < 0 {
         x = -x;
@@ -2338,7 +2110,7 @@ fn exponential_series(mut x: Float, type: u32, prec: u32) -> (Float, Float) {
     let wp = prec + extra;
     x <<= extra - r;
     one = Float::with_val(wp, 1.0) << wp;
-    alt = (type == 2);
+    alt = (utype == 2);
     if prec < EXP_SERIES_U_CUTOFF {
         let a = (x * x) >> wp;
         let x2 = a;
@@ -2389,7 +2161,7 @@ fn exponential_series(mut x: Float, type: u32, prec: u32) -> (Float, Float) {
         c = sum(sums) + one;
     }
     /*
-    if type == 0:
+    if utype == 0:
         s = isqrt_fast(c*c - (one<<wp))
         if sign:
             v = c - s
@@ -2400,7 +2172,7 @@ fn exponential_series(mut x: Float, type: u32, prec: u32) -> (Float, Float) {
         return v >> extra
     else:
     */
-    if type == 1 || type == 2 {
+    if utype == 1 || utype == 2 {
         let pshift = wp - 1;
         for i in 0..r {
             c = ((c*c) >> pshift) - one;
