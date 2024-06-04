@@ -2502,7 +2502,7 @@ fn mpc_expj(z: Complex, prec: u32) -> Complex {
 // 
 // https://github.com/mpmath/mpmath/blob/master/mpmath/functions/rszeta.py#L766
 // 
-fn Rzeta_set(s: Complex, derivatives: Vec<u32>) {
+fn Rzeta_set(s: Complex, derivatives: Vec<u32>) -> HashMap<u32, Complex> {
     derivatives = vec![0];
     let der = derivatives.iter().max().unwrap();
     let wpinitial = s.prec();
@@ -3041,7 +3041,7 @@ fn eulernum(m: i64) -> Float {
 // 
 fn euler_fixed(mut prec: u32) -> Float {
     prec += 30;
-    let p = ((prec as f32)/4.0) * (2 as f32).ln()).ln2() as i32 + 1;
+    let p = ((prec as f32)/4.0 * (2 as f32).ln()).ln2() as i32 + 1;
     let n = Integer::from(2).pow(p);
     let npow2 = n.pow(2);
     let A = Float::with_val(prec, -p as f32 * (prec as f32).ln2());
@@ -3749,7 +3749,7 @@ fn Rzeta_simul(s, der=0) {
     ywprssum = max(ywprssum, mag(Float:with_val(15, 10*(L+1))));
     //prec = ywprssum;
     for chi in 0..(der+1) {
-        yrssum.insert(chi, Float::with_val(ywprssum, 0.0));
+        yrs9sum.insert(chi, Float::with_val(ywprssum, 0.0));
         for k in 1..(L+1) {
             yrssum[chi] += yterm[chi, L-k];
         }
@@ -3856,7 +3856,7 @@ fn z_offline(w: Complex, k: i32) {
     w.set_prec(wptheta);
     let theta = siegeltheta(w);
     s.set_prec(wpR);
-    let (xrz, yrz) = Rzeta_simul(s,k);
+    let (xrz, yrz) = Rzeta_simul(s, k);
     w.set_prec(wpR);
     let pta = Complex::with_val(wpR, (0.25, 0.5)) * w;
     let ptb = Complex::with_val(wpR, (0.25, -0.5)) * w;
